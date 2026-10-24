@@ -1,0 +1,14 @@
+{
+  "id": "offline",
+  "name": "Offline",
+  "version": "1.0.0",
+  "api": 1,
+  "description": "Local profiles for singleplayer and offline-mode servers, without signing in.",
+  "contributes": {
+    "account": {
+      "fields": [
+        { "key": "username", "label": "Username", "hint": "3–16 letters, digits or underscores.", "type": "text" }
+      ]
+    }
+  }
+}
