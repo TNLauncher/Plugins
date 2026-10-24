@@ -18,21 +18,31 @@
   <script type="module">
     // In an instance tab `tn.context.instance` is set: show that instance only.
     const only = tn.context.instance;
-    const [log, instances] = await Promise.all([tn.storage.get("log"), tn.instances.list()]);
-    const names = new Map(instances.map((i) => [i.id, i.name]));
-    const rows = (log ?? []).filter((s) => !only || s.instanceId === only).reverse();
-    if (only) document.getElementById("title").textContent = `Sessions of ${names.get(only) ?? "this instance"}`;
-    document.getElementById("empty").hidden = rows.length > 0;
     const length = (s) => (s.end ? `${Math.max(1, Math.round((s.end - s.start) / 60000))} min` : "playing");
-    for (const s of rows) {
-      const tr = document.createElement("tr");
-      for (const text of [names.get(s.instanceId) ?? "deleted", new Date(s.start).toLocaleString(), length(s), s.code ?? "—"]) {
-        const td = document.createElement("td");
-        td.textContent = String(text);
-        tr.append(td);
+
+    async function render() {
+      const [log, instances] = await Promise.all([tn.storage.get("log"), tn.instances.list()]);
+      const names = new Map(instances.map((i) => [i.id, i.name]));
+      const rows = (log ?? []).filter((s) => !only || s.instanceId === only).reverse();
+      if (only) document.getElementById("title").textContent = `Sessions of ${names.get(only) ?? "this instance"}`;
+      document.getElementById("empty").hidden = rows.length > 0;
+      const tbody = document.getElementById("rows");
+      tbody.replaceChildren();
+      for (const s of rows) {
+        const tr = document.createElement("tr");
+        for (const text of [names.get(s.instanceId) ?? "deleted", new Date(s.start).toLocaleString(), length(s), s.code ?? "—"]) {
+          const td = document.createElement("td");
+          td.textContent = String(text);
+          tr.append(td);
+        }
+        tbody.append(tr);
       }
-      document.getElementById("rows").append(tr);
     }
+
+    await render();
+    tn.events.on("storage-changed", ({ key }) => {
+      if (key === "log") render();
+    });
   </script>
 </body>
 </html>

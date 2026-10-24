@@ -26,8 +26,19 @@ const tn = {
     async fetch(url, init = {}) {
       if (!allowed(url)) throw new Error(`${manifest.name} may not connect to ${url}`);
       const res = await fetch(url, { method: init.method, headers: init.headers, body: init.body });
-      const body = await res.text();
-      return { status: res.status, ok: res.ok, contentType: res.headers.get("content-type") ?? "", text: () => body, json: () => JSON.parse(body) };
+      const buf = new Uint8Array(await res.arrayBuffer());
+      const body = new TextDecoder().decode(buf);
+      const headers = Object.fromEntries(res.headers.entries());
+      return {
+        status: res.status,
+        ok: res.ok,
+        contentType: res.headers.get("content-type") ?? "",
+        headers,
+        text: () => body,
+        json: () => JSON.parse(body),
+        bytes: () => buf,
+        arrayBuffer: () => buf.buffer,
+      };
     },
   },
   log: async (...a) => console.error("[log]", ...a),

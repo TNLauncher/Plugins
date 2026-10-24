@@ -7,7 +7,7 @@
   "contributes": {
     "pages": [{ "id": "journal", "title": "Sessions", "icon": "history", "entry": "page.html" }],
     "instanceTabs": [{ "id": "sessions", "title": "Sessions", "icon": "history", "entry": "page.html" }],
-    "settings": [{ "key": "keep", "label": "Sessions to keep", "hint": "Older ones are dropped. Empty = 100.", "type": "text" }]
+    "settings": [{ "key": "keep", "label": "Sessions to keep", "hint": "Older ones are dropped.", "type": "text", "default": "100" }]
   },
   "permissions": { "instances": true }
 }
