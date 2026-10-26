@@ -1,13 +1,14 @@
 // @ts-check
-// CurseForge (api.curseforge.com/v1) as a TNLauncher content source, with CurseForge modpack zips.
-// Every request needs the user's API key (plugin setting `apiKey`).
+// CurseForge as a TNLauncher content source, with CurseForge modpack zips.
+// Goes through the keyless api.curse.tools proxy; with an `apiKey` setting, the official API instead.
 /** @typedef {import("../packages/plugin-api").TN} TN */
 /** @typedef {import("../packages/plugin-api").ProjectKind} ProjectKind */
 /** @typedef {import("../packages/plugin-api").SearchQuery} SearchQuery */
 /** @typedef {import("../packages/plugin-api").Version} Version */
 /** @typedef {import("../packages/plugin-api").PackPlan} PackPlan */
 
-const API = "https://api.curseforge.com/v1";
+const API = "https://api.curse.tools/v1/cf";
+const OFFICIAL_API = "https://api.curseforge.com/v1";
 const MINECRAFT = 432;
 /** CurseForge "classes" (sections) per kind. */
 export const CLASS = /** @type {const} */ ({ mod: 6, resourcepack: 12, shader: 6552, modpack: 4471 });
@@ -66,24 +67,23 @@ export function version(f) {
   };
 }
 
-/** A CurseForge modpack's manifest.json as a launcher plan. `files` is what the API says about its file ids. */
-export function plan(/** @type {any} */ manifest, /** @type {any[]} */ files, /** @type {Map<number, number>} */ classOf) {
+/** A CurseForge modpack's manifest.json as a launcher plan. `files` and `mods` are what the API says about its file ids. */
+export function plan(/** @type {any} */ manifest, /** @type {any[]} */ files, /** @type {Map<number, any>} */ mods) {
   const primary = manifest.minecraft?.modLoaders?.find((/** @type {any} */ l) => l.primary) ?? manifest.minecraft?.modLoaders?.[0];
   const [loader = "", loaderVersion = ""] = primary ? String(primary.id).split(/-(.*)/s) : [];
-  const blocked = files.filter((f) => !f.downloadUrl).map((f) => f.displayName ?? f.fileName);
-  if (blocked.length) throw new Error(`Their authors don't allow launchers to download: ${blocked.join(", ")}. Install this pack from the CurseForge app.`);
   return {
     name: manifest.name,
     gameVersion: manifest.minecraft.version,
     loader,
     loaderVersion,
-    files: files.map((f) => ({
-      path: `${FOLDER[classOf.get(f.modId) ?? 6] ?? "mods"}/${f.fileName}`,
-      urls: [f.downloadUrl],
-      size: f.fileLength ?? null,
+    files: files.map((f) => {
+      const mod = mods.get(f.modId);
+      // No downloadUrl: the author does not allow launchers, so the user fetches it from its page.
+      const page = f.downloadUrl ? null : `${mod?.links?.websiteUrl ?? `https://www.curseforge.com/projects/${f.modId}`}/files/${f.id}`;
       // Hash algo 1 is SHA-1.
-      sha1: f.hashes?.find((/** @type {any} */ h) => h.algo === 1)?.value ?? null,
-    })),
+      const sha1 = f.hashes?.find((/** @type {any} */ h) => h.algo === 1)?.value ?? null;
+      return { path: `${FOLDER[mod?.classId ?? 6] ?? "mods"}/${f.fileName}`, urls: f.downloadUrl ? [f.downloadUrl] : [], size: f.fileLength ?? null, page, sha1 };
+    }),
     overrides: [manifest.overrides || "overrides"],
   };
 }
@@ -97,14 +97,14 @@ export function activate(tn) {
    */
   async function request(path, params = {}, body) {
     const key = (await tn.settings.get()).apiKey;
-    if (!key) throw new Error("Add your CurseForge API key in Settings → Plugins (get one at console.curseforge.com).");
     const query = new URLSearchParams(params).toString();
-    const url = `${API}${path}${query ? `?${query}` : ""}`;
+    const url = `${key ? OFFICIAL_API : API}${path}${query ? `?${query}` : ""}`;
     /** @type {Record<string, string>} */
-    const headers = { "x-api-key": String(key), Accept: "application/json" };
+    const headers = { Accept: "application/json" };
+    if (key) headers["x-api-key"] = String(key);
     if (body) headers["Content-Type"] = "application/json";
     const res = await tn.net.fetch(url, { method: body ? "POST" : "GET", headers, body: body && JSON.stringify(body) });
-    if (res.status === 403) throw new Error("CurseForge refused the API key. Check it in Settings → Plugins.");
+    if (res.status === 403) throw new Error(key ? "CurseForge refused the API key. Check it in Settings → Plugins." : "CurseForge (via api.curse.tools) refused the request.");
     if (!res.ok) throw new Error(`${url} returned HTTP ${res.status}`);
     return /** @type {any} */ (res.json());
   }
@@ -198,7 +198,7 @@ export function activate(tn) {
       if (!entries.length) return plan(manifest, [], new Map());
       const files = /** @type {any[]} */ (await api("/mods/files", {}, { fileIds: entries.map((f) => f.fileID) }));
       const mods = /** @type {any[]} */ (await api("/mods", {}, { modIds: [...new Set(files.map((f) => f.modId))] }));
-      return plan(manifest, files, new Map(mods.map((m) => [m.id, m.classId])));
+      return plan(manifest, files, new Map(mods.map((m) => [m.id, m])));
     },
   });
 }

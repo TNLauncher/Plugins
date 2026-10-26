@@ -24,12 +24,14 @@ test("maps files to versions", () => {
   assert.deepEqual(v.dependencies, [{ projectId: "7", fileName: null, kind: "required" }]);
 });
 
-test("plans packs and refuses blocked files", () => {
+test("plans packs and sends blocked files to their page", () => {
   const manifest = { name: "P", overrides: "overrides", minecraft: { version: "1.20.1", modLoaders: [{ id: "fabric-0.15.11", primary: true }] } };
   const files = [{ modId: 1, fileName: "a.jar", downloadUrl: "https://edge.forgecdn.net/a.jar", fileLength: 3 }, { modId: 2, fileName: "p.zip", downloadUrl: "https://edge.forgecdn.net/p.zip" }];
-  const p = plan(manifest, files, new Map([[1, 6], [2, 12]]));
+  const p = plan(manifest, files, new Map([[1, { classId: 6 }], [2, { classId: 12 }]]));
   assert.deepEqual([p.loader, p.loaderVersion, p.gameVersion], ["fabric", "0.15.11", "1.20.1"]);
   assert.deepEqual(p.files.map((f) => f.path), ["mods/a.jar", "resourcepacks/p.zip"]);
   assert.equal(plan({ ...manifest, minecraft: { version: "1.20.1", modLoaders: [{ id: "neoforge-21.1.1" }] } }, [], new Map()).loader, "neoforge");
-  assert.throws(() => plan(manifest, [{ modId: 1, fileName: "x.jar", displayName: "X", downloadUrl: null }], new Map()), /X/);
+  const blocked = plan(manifest, [{ id: 9, modId: 1, fileName: "x.jar", downloadUrl: null }], new Map([[1, { classId: 6, links: { websiteUrl: "https://www.curseforge.com/minecraft/mc-mods/x" } }]])).files[0];
+  assert.deepEqual([blocked.urls, blocked.page], [[], "https://www.curseforge.com/minecraft/mc-mods/x/files/9"]);
+  assert.equal(p.files[0].page, null);
 });

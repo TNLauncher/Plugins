@@ -3,7 +3,7 @@
   "name": "CurseForge",
   "version": "1.0.0",
   "api": 1,
-  "description": "Mods, resource packs, shaders and modpacks from curseforge.com. Needs your own API key from console.curseforge.com.",
+  "description": "Mods, resource packs, shaders and modpacks from curseforge.com.",
   "contributes": {
     "source": {
       "hash": "murmur2",
@@ -183,14 +183,15 @@
     "settings": [
       {
         "key": "apiKey",
-        "label": "API key",
-        "hint": "Create one at console.curseforge.com; CurseForge requires it for every request.",
+        "label": "API key (optional)",
+        "hint": "Optional. Leave empty to use api.curse.tools; set your console.curseforge.com key to use the official API.",
         "type": "secret"
       }
     ]
   },
   "permissions": {
     "hosts": [
+      "api.curse.tools",
       "api.curseforge.com",
       "media.forgecdn.net"
     ],
