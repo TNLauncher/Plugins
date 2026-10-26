@@ -12,5 +12,5 @@
     "noEmit": true,
     "types": []
   },
-  "include": ["*/main.js", "examples/*/main.js", "packages/plugin-api"]
+  "include": ["*/main.js", "repair/doctor.js", "repair/page.js", "examples/*/main.js", "packages/plugin-api"]
 }

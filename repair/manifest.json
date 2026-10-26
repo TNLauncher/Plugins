@@ -1,0 +1,21 @@
+{
+  "id": "repair",
+  "name": "Repair",
+  "version": "1.0.0",
+  "api": 1,
+  "description": "Finds why an instance crashes or will not start, offers fixes, and repairs damaged game and pack files.",
+  "contributes": {
+    "instanceTabs": [{ "id": "repair", "title": "Repair", "icon": "healing", "entry": "page.html", "header": true, "crash": true }],
+    "settings": [
+      {
+        "key": "source",
+        "label": "Install missing mods from",
+        "hint": "Used for instances made by hand; modpacks install from their own source.",
+        "type": "select",
+        "default": "modrinth",
+        "options": [{ "id": "modrinth", "label": "Modrinth" }, { "id": "curseforge", "label": "CurseForge" }]
+      }
+    ]
+  },
+  "permissions": { "instances": true, "content": true }
+}
