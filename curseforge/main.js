@@ -77,7 +77,13 @@ export function plan(/** @type {any} */ manifest, /** @type {any[]} */ files, /*
     gameVersion: manifest.minecraft.version,
     loader,
     loaderVersion,
-    files: files.map((f) => ({ path: `${FOLDER[classOf.get(f.modId) ?? 6] ?? "mods"}/${f.fileName}`, urls: [f.downloadUrl], size: f.fileLength ?? null })),
+    files: files.map((f) => ({
+      path: `${FOLDER[classOf.get(f.modId) ?? 6] ?? "mods"}/${f.fileName}`,
+      urls: [f.downloadUrl],
+      size: f.fileLength ?? null,
+      // Hash algo 1 is SHA-1.
+      sha1: f.hashes?.find((/** @type {any} */ h) => h.algo === 1)?.value ?? null,
+    })),
     overrides: [manifest.overrides || "overrides"],
   };
 }

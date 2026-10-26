@@ -64,7 +64,7 @@ export function plan(index) {
     loaderVersion,
     files: (index.files ?? [])
       .filter((/** @type {any} */ f) => f.env?.client !== "unsupported")
-      .map((/** @type {any} */ f) => ({ path: f.path, urls: f.downloads, size: f.fileSize ?? null })),
+      .map((/** @type {any} */ f) => ({ path: f.path, urls: f.downloads, size: f.fileSize ?? null, sha1: f.hashes?.sha1 ?? null })),
     // client-overrides go second so they win over the shared ones.
     overrides: ["overrides", "client-overrides"],
   };
