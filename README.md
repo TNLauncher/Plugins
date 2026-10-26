@@ -11,6 +11,9 @@ Official and example plugins for [TNLauncher](https://github.com/TNLauncher/Laun
 | [`discord`](./discord) | Presence | Shows the running Minecraft version, loader and mod count in Discord Rich Presence |
 | [`elyby`](./elyby) | Account provider | Ely.by accounts and skins through `authlib-injector` |
 | [`offline`](./offline) | Account provider | Local profiles for singleplayer and offline-mode servers |
+| [`mclogs`](./mclogs) | Instance tab | Uploads the game log or crash report to mclo.gs for a shareable link |
+| [`export`](./export) | Instance tab | Exports an instance as a Modrinth `.mrpack` or a Prism/MultiMC zip |
+| [`prism`](./prism) | Importer | Imports Prism Launcher and MultiMC instance zips |
 | [`examples/sessions`](./examples/sessions) | Page & instance tab | Example plugin that records play sessions |
 
 ## Installation

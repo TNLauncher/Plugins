@@ -1,0 +1,46 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { padding: 24px; display: flex; flex-direction: column; gap: 14px; max-width: 640px; }
+    h1 { margin: 0; font-size: 18px; font-weight: 600; }
+    p { margin: 0; color: var(--muted); }
+    fieldset { border: 0; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+    label { display: flex; gap: 8px; align-items: baseline; cursor: pointer; }
+    label small { color: var(--muted); }
+    button { align-self: flex-start; font: inherit; padding: 6px 14px; border-radius: 8px; border: 0; background: var(--accent); color: #fff; cursor: pointer; }
+    button:disabled { opacity: 0.5; cursor: default; }
+    .error { color: var(--critical); }
+  </style>
+</head>
+<body>
+  <h1>Export instance</h1>
+  <fieldset>
+    <label><input type="radio" name="format" value="mrpack" checked> Modrinth (.mrpack) <small>Mods from Modrinth are linked, not copied: a small file any launcher can import.</small></label>
+    <label><input type="radio" name="format" value="prism"> Prism / MultiMC (.zip) <small>Everything copied as is.</small></label>
+  </fieldset>
+  <label><input type="checkbox" id="worlds"> Include worlds</label>
+  <button id="go">Export…</button>
+  <p id="status" role="status"></p>
+  <script type="module">
+    import { exportInstance } from "./main.js";
+    const $ = (s) => document.getElementById(s);
+    $("go").onclick = async () => {
+      const format = document.querySelector("input[name=format]:checked").value;
+      $("go").disabled = true;
+      $("status").classList.remove("error");
+      $("status").textContent = format === "mrpack" ? "Looking up mods on Modrinth…" : "";
+      try {
+        const path = await exportInstance(tn, tn.context.instance, { format, worlds: $("worlds").checked });
+        $("status").textContent = path ? `Saved to ${path}` : "";
+      } catch (e) {
+        $("status").classList.add("error");
+        $("status").textContent = String(e.message ?? e);
+      } finally {
+        $("go").disabled = false;
+      }
+    };
+  </script>
+</body>
+</html>

@@ -1,0 +1,70 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { padding: 24px; display: flex; flex-direction: column; gap: 14px; max-width: 640px; }
+    h1 { margin: 0; font-size: 18px; font-weight: 600; }
+    p { margin: 0; color: var(--muted); }
+    .row { display: flex; gap: 8px; align-items: center; }
+    input { flex: 1; font: inherit; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--card); color: var(--fg); }
+    button { font: inherit; padding: 6px 14px; border-radius: 8px; border: 1px solid var(--border); background: var(--card); color: var(--fg); cursor: pointer; }
+    button.primary { background: var(--accent); border-color: transparent; color: #fff; }
+    button:disabled { opacity: 0.5; cursor: default; }
+    .error { color: var(--critical); }
+  </style>
+</head>
+<body>
+  <h1>Share log</h1>
+  <p>Uploads to <b>mclo.gs</b>, which hides IP addresses and access tokens. Anyone with the link can read it.</p>
+  <div class="row">
+    <button class="primary" id="log">Upload game log</button>
+    <button id="crash" hidden>Upload crash report</button>
+  </div>
+  <div class="row" id="result" hidden>
+    <input id="url" readonly aria-label="Link">
+    <button id="copy">Copy</button>
+    <button id="open">Open</button>
+  </div>
+  <p id="status" role="status"></p>
+  <script type="module">
+    import { upload } from "./main.js";
+    const id = tn.context.instance;
+    const $ = (s) => document.getElementById(s);
+    const status = (text, error = false) => ((($("status").textContent = text), $("status").classList.toggle("error", error)));
+
+    const crash = await tn.instances.crashReports(id);
+    $("crash").hidden = !crash;
+
+    async function share(read, button) {
+      button.disabled = true;
+      status("Uploading…");
+      try {
+        const text = await read();
+        if (!text.trim()) throw new Error("Nothing to upload yet: launch the game first.");
+        $("url").value = await upload(tn, text);
+        $("result").hidden = false;
+        status("Done. Paste the link where you ask for help.");
+      } catch (e) {
+        status(String(e.message ?? e), true);
+      } finally {
+        button.disabled = false;
+      }
+    }
+
+    $("log").onclick = () => share(() => tn.instances.readLog(id), $("log"));
+    $("crash").onclick = () => share(async () => crash, $("crash"));
+    $("open").onclick = () => tn.open($("url").value);
+    $("copy").onclick = async () => {
+      // The frame may not get clipboard access; then the selected text is one Ctrl+C away.
+      $("url").select();
+      try {
+        await navigator.clipboard.writeText($("url").value);
+        status("Copied.");
+      } catch {
+        status("Press Ctrl+C to copy the selected link.");
+      }
+    };
+  </script>
+</body>
+</html>

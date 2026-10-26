@@ -1,0 +1,11 @@
+{
+  "id": "mclogs",
+  "name": "Share logs",
+  "version": "1.0.0",
+  "api": 1,
+  "description": "Uploads the game log or crash report to mclo.gs and gives you a link for support chats.",
+  "contributes": {
+    "instanceTabs": [{ "id": "share", "title": "Share log", "icon": "share", "entry": "page.html", "header": true, "crash": true }]
+  },
+  "permissions": { "instances": true, "hosts": ["api.mclo.gs"] }
+}

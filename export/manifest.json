@@ -1,0 +1,11 @@
+{
+  "id": "export",
+  "name": "Export instance",
+  "version": "1.0.0",
+  "api": 1,
+  "description": "Saves an instance as a Modrinth modpack (.mrpack) or a Prism/MultiMC zip to share or move it.",
+  "contributes": {
+    "instanceTabs": [{ "id": "export", "title": "Export", "icon": "ios_share", "entry": "page.html", "header": true }]
+  },
+  "permissions": { "instances": true, "hosts": ["api.modrinth.com"] }
+}
