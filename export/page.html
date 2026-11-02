@@ -1,46 +1,301 @@
 <!doctype html>
-<html>
+<html lang="en">
 <head>
   <meta charset="utf-8">
+  <title>Export</title>
   <style>
-    body { padding: 24px; display: flex; flex-direction: column; gap: 14px; max-width: 640px; }
-    h1 { margin: 0; font-size: 18px; font-weight: 600; }
-    p { margin: 0; color: var(--muted); }
-    fieldset { border: 0; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
-    label { display: flex; gap: 8px; align-items: baseline; cursor: pointer; }
-    label small { color: var(--muted); }
-    button { align-self: flex-start; font: inherit; padding: 6px 14px; border-radius: 8px; border: 0; background: var(--accent); color: #fff; cursor: pointer; }
-    button:disabled { opacity: 0.5; cursor: default; }
-    .error { color: var(--critical); }
+    /* Tokens and base styles come from the launcher (__tn/theme.css); controls mirror its kit. */
+    html, body { height: 100%; }
+    body { padding: 0 2px 16px; overflow: hidden; }
+    .layout { height: 100%; display: grid; grid-template-columns: minmax(300px, 380px) minmax(0, 1fr); gap: 16px; }
+    .pane {
+      min-height: 0; padding: 16px; display: flex; flex-direction: column; gap: 16px; overflow-y: auto;
+      border-radius: 18px; background: var(--window); border: 1px solid var(--card-border); box-shadow: var(--highlight);
+    }
+    .head { display: flex; flex-direction: column; gap: 4px; }
+    h3 { margin: 0; font-size: 13px; font-weight: 600; line-height: 1.3; }
+    h4 { margin: 0; font-size: 11px; font-weight: 500; color: var(--subtle); }
+    .head p, .hint { margin: 0; font-size: 12px; line-height: 1.5; color: var(--muted); }
+    .section { display: flex; flex-direction: column; gap: 8px; }
+    .rule { padding-top: 16px; box-shadow: inset 0 1px 0 var(--card-border); }
+
+    /* Format: radio cards. The native radio stays for keyboard and screen readers. */
+    fieldset { margin: 0; padding: 0; border: 0; display: flex; flex-direction: column; gap: 8px; }
+    legend { padding: 0; margin-bottom: 8px; font-size: 11px; font-weight: 500; color: var(--subtle); }
+    .option {
+      position: relative; display: grid; grid-template-columns: 32px minmax(0, 1fr); gap: 4px 12px; padding: 12px; cursor: pointer;
+      border-radius: 14px; background: var(--card); border: 1px solid var(--card-border); box-shadow: var(--highlight);
+      transition: background var(--quick) var(--butter), border-color var(--quick) var(--butter), box-shadow var(--soft) var(--butter);
+    }
+    .option:hover { background: var(--card-hover); }
+    .option input { position: absolute; opacity: 0; pointer-events: none; }
+    .option:has(input:checked) { border-color: var(--accent); background: rgb(10 132 255 / 0.08); box-shadow: var(--highlight), 0 0 0 3px rgb(10 132 255 / 0.12); }
+    .option:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .mark { grid-row: span 2; width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center; background: rgb(255 255 255 / 0.06); color: var(--icon); transition: background var(--quick) var(--butter), color var(--quick) var(--butter); }
+    .mark .icon { font-size: 18px; }
+    .option:has(input:checked) .mark { background: rgb(10 132 255 / 0.16); color: var(--accent); }
+    .title { display: flex; align-items: center; gap: 8px; padding-right: 22px; font-size: 12px; font-weight: 600; }
+    .ext { padding: 1px 6px; border-radius: 6px; font: 500 11px var(--mono); color: var(--muted); background: rgb(255 255 255 / 0.06); }
+    .desc { font-size: 12px; line-height: 1.45; color: var(--muted); }
+    .check { position: absolute; top: 10px; right: 10px; font-size: 18px; color: var(--accent); opacity: 0; transform: scale(0.6); transition: opacity var(--quick) var(--butter), transform var(--soft) var(--spring); }
+    .option:has(input:checked) .check { opacity: 1; transform: none; }
+
+    .toggle { display: flex; align-items: center; justify-content: space-between; gap: 16px; cursor: pointer; }
+    .toggle span { display: flex; flex-direction: column; gap: 2px; font-size: 12px; }
+    .toggle small { font-size: 12px; color: var(--muted); }
+    .switch { position: relative; width: 36px; height: 20px; flex-shrink: 0; }
+    .switch input { position: absolute; inset: 0; margin: 0; opacity: 0; cursor: pointer; }
+    .track { position: absolute; inset: 0; border-radius: 999px; background: rgb(255 255 255 / 0.18); pointer-events: none; transition: background var(--soft) var(--butter); }
+    .track::after { content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgb(0 0 0 / 0.35); transition: left var(--soft) var(--spring); }
+    .switch input:checked + .track { background: var(--accent-fill); }
+    .switch input:checked + .track::after { left: 18px; }
+    .switch input:focus-visible + .track { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+    .status { display: flex; align-items: flex-start; gap: 6px; margin: 0; min-width: 0; font-size: 12px; line-height: 1.45; color: var(--muted); overflow-wrap: anywhere; }
+    .status:empty { display: none; }
+    .status .icon { font-size: 16px; }
+    .status.ok { color: var(--fg); }
+    .status.ok .icon { color: var(--green); animation: tick var(--slow) var(--spring); }
+    .status.error { color: var(--critical); }
+    .status b { font: 500 11px var(--mono); color: var(--fg); }
+    @keyframes tick { from { opacity: 0; transform: scale(0.4) rotate(-20deg); } }
+
+    .btn {
+      align-self: flex-start; height: 32px; padding: 0 14px; border-radius: 999px; display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0;
+      background: var(--accent-fill); border: 1px solid transparent; color: #fff; box-shadow: var(--highlight), 0 4px 14px -6px rgb(0 113 227 / 0.6);
+      font-size: 12px; font-weight: 500; white-space: nowrap;
+      transition: background var(--quick) var(--butter), opacity var(--quick) var(--butter), transform var(--soft) var(--spring);
+    }
+    .btn:hover { background: var(--accent); }
+    .btn:active { transform: scale(0.95); transition: transform var(--press) var(--butter); }
+    .btn:disabled { opacity: 0.6; pointer-events: none; }
+    .btn .icon { font-size: 16px; }
+
+    /* Recent exports. */
+    .recent { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; }
+    .recent li { display: grid; grid-template-columns: 20px minmax(0, 1fr) auto; align-items: center; gap: 8px; padding: 7px 0; font-size: 12px; }
+    .recent li + li { box-shadow: inset 0 1px 0 var(--card-border); }
+    .recent .icon { font-size: 16px; color: var(--subtle); }
+    .recent b { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .recent time { color: var(--subtle); font-size: 11px; }
+
+    /* What goes in. */
+    .rows { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; }
+    .row { display: grid; grid-template-columns: 32px minmax(0, 1fr); align-items: center; gap: 12px; padding: 10px 0; }
+    .row + .row { box-shadow: inset 0 1px 0 var(--card-border); }
+    .row .mark { grid-row: auto; }
+    .row-text { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+    .row-text b { font-size: 12px; font-weight: 600; }
+    .parts { display: flex; flex-wrap: wrap; gap: 4px 6px; }
+    .part { display: inline-flex; align-items: center; gap: 4px; padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 500; white-space: nowrap; background: rgb(255 255 255 / 0.06); color: var(--muted); }
+    .part .icon { font-size: 13px; }
+    .part.linked { background: rgb(48 209 88 / 0.12); color: var(--green); }
+    .part.copied { background: rgb(10 132 255 / 0.12); color: var(--link); }
+    .part.out { color: var(--subtle); }
+    .warn { display: flex; align-items: flex-start; gap: 8px; margin: 0; padding: 8px 10px; border-radius: 12px; font-size: 12px; line-height: 1.45; background: rgb(255 159 10 / 0.1); border: 1px solid rgb(255 159 10 / 0.24); }
+    .warn .icon { font-size: 16px; color: var(--warning); }
+    .files { margin: 0; padding: 0; list-style: none; columns: 2 260px; column-gap: 24px; }
+    .files li { display: flex; align-items: center; gap: 6px; padding: 3px 0; break-inside: avoid; font: 11px var(--mono); color: var(--muted); min-width: 0; }
+    .files li span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .files .icon { font-size: 14px; color: var(--subtle); }
+    .skeleton {
+      height: 52px; border-radius: 12px;
+      background: linear-gradient(90deg, var(--card) 25%, rgb(255 255 255 / 0.1) 50%, var(--card) 75%);
+      background-size: 200% 100%; animation: shimmer 1.4s infinite;
+    }
+    @keyframes shimmer { to { background-position: -200% 0; } }
+
+    @media (max-width: 760px) {
+      body { overflow-y: auto; }
+      .layout { height: auto; grid-template-columns: minmax(0, 1fr); }
+    }
+    @media (prefers-reduced-motion: reduce) { .skeleton { animation: none; } }
   </style>
 </head>
 <body>
-  <h1>Export instance</h1>
-  <fieldset>
-    <label><input type="radio" name="format" value="mrpack" checked> Modrinth (.mrpack) <small>Mods from Modrinth are linked, not copied: a small file any launcher can import.</small></label>
-    <label><input type="radio" name="format" value="prism"> Prism / MultiMC (.zip) <small>Everything copied as is.</small></label>
-  </fieldset>
-  <label><input type="checkbox" id="worlds"> Include worlds</label>
-  <button id="go">Export…</button>
-  <p id="status" role="status"></p>
+  <div class="layout">
+    <section class="pane" aria-labelledby="title">
+      <div class="head">
+        <h3 id="title">Export instance</h3>
+        <p>Save this instance as a file to share it or move it to another launcher.</p>
+      </div>
+
+      <fieldset>
+        <legend>Format</legend>
+        <label class="option">
+          <input type="radio" name="format" value="mrpack" checked>
+          <span class="mark" aria-hidden="true"><i class="icon">inventory_2</i></span>
+          <span class="title">Modrinth <span class="ext">.mrpack</span></span>
+          <span class="desc">Mods from Modrinth are linked, not copied: a small file any launcher can import.</span>
+          <i class="icon check fill" aria-hidden="true">check_circle</i>
+        </label>
+        <label class="option">
+          <input type="radio" name="format" value="prism">
+          <span class="mark" aria-hidden="true"><i class="icon">folder_zip</i></span>
+          <span class="title">Prism / MultiMC <span class="ext">.zip</span></span>
+          <span class="desc">Everything copied as is, for Prism Launcher and MultiMC.</span>
+          <i class="icon check fill" aria-hidden="true">check_circle</i>
+        </label>
+      </fieldset>
+
+      <label class="toggle">
+        <span>Include worlds<small>Everything in saves/. Big worlds make a big file.</small></span>
+        <span class="switch"><input type="checkbox" id="worlds"><span class="track"></span></span>
+      </label>
+
+      <div class="section">
+        <button type="button" class="btn" id="go"><i class="icon" aria-hidden="true">ios_share</i><span>Export…</span></button>
+        <p class="status" id="status" role="status"></p>
+      </div>
+
+      <div class="section rule" id="recent-box" hidden>
+        <h4>Recent exports</h4>
+        <ul class="recent" id="recent"></ul>
+      </div>
+    </section>
+
+    <section class="pane" aria-labelledby="contents" aria-busy="true" id="preview">
+      <div class="head">
+        <h3 id="contents">What goes in</h3>
+        <p id="contents-hint"></p>
+      </div>
+      <div id="contents-body"></div>
+    </section>
+  </div>
   <script type="module">
-    import { exportInstance } from "./main.js";
+    import { exportInstance, survey } from "./main.js";
+    const id = tn.context.instance;
     const $ = (s) => document.getElementById(s);
-    $("go").onclick = async () => {
-      const format = document.querySelector("input[name=format]:checked").value;
+    /** @param {string} tag @param {Record<string, any>} attrs @param {(Node | string | null | false)[]} kids */
+    function h(tag, attrs = {}, ...kids) {
+      const e = document.createElement(tag);
+      for (const [k, v] of Object.entries(attrs)) k === "class" ? (e.className = v) : e.setAttribute(k, v);
+      e.append(...kids.filter((k) => k != null && k !== false));
+      return e;
+    }
+    const icon = (name, spin = false) => h("i", { class: `icon${spin ? " spin" : ""}`, "aria-hidden": "true" }, name);
+    const options = () => ({ format: document.querySelector("input[name=format]:checked").value, worlds: $("worlds").checked });
+    const KINDS = [["mod", "Mods", "extension"], ["resourcepack", "Resource packs", "texture"], ["shader", "Shaders", "wb_twilight"]];
+    const FILE_ICON = { mod: "extension", resourcepack: "texture", shader: "wb_twilight" };
+    const part = (cls, iconName, text) => h("span", { class: `part ${cls}` }, iconName ? icon(iconName) : null, text);
+
+    /** @type {Awaited<ReturnType<typeof survey>> | null} */
+    let s = null;
+
+    function row(iconName, label, ...parts) {
+      return h("li", { class: "row" }, h("span", { class: "mark", "aria-hidden": "true" }, icon(iconName)), h("div", { class: "row-text" }, h("b", {}, label), h("div", { class: "parts" }, ...parts)));
+    }
+
+    function renderPreview() {
+      const body = $("contents-body");
+      $("preview").setAttribute("aria-busy", String(!s));
+      if (!s) {
+        $("contents-hint").textContent = "Reading the instance…";
+        body.replaceChildren(h("div", { class: "section" }, ...[0, 1, 2, 3].map(() => h("div", { class: "skeleton" }))));
+        return;
+      }
+      const o = options();
+      const mrpack = o.format === "mrpack";
+      $("contents-hint").textContent = mrpack
+        ? "Linked files download from Modrinth when the pack is imported. Copied ones travel inside the file."
+        : "Every file is copied into the archive as it is on disk.";
+      const rows = KINDS.map(([kind, label, iconName]) => {
+        const k = s.kinds[kind];
+        const total = k.hosted.length + k.copied.length;
+        const parts = !total && !k.off.length
+          ? [part("out", null, "None")]
+          : mrpack
+            ? [
+                k.hosted.length && part("linked", "link", `${k.hosted.length} linked`),
+                k.copied.length && part("copied", "content_copy", `${k.copied.length} copied`),
+                k.off.length && part("out", "block", `${k.off.length} off, left out`),
+              ]
+            : [part("copied", "content_copy", `${total + k.off.length} copied`)];
+        return row(iconName, label, ...parts.filter(Boolean));
+      });
+      rows.push(
+        row("public", "Worlds", o.worlds ? part("copied", "content_copy", "Copied") : part("out", "block", "Left out")),
+        row("tune", "Settings and configs", part("copied", "content_copy", "Copied")),
+        row("description", "Logs and crash reports", part("out", "block", "Left out"))
+      );
+      const copied = mrpack ? KINDS.flatMap(([kind]) => s.kinds[kind].copied.map((f) => [kind, f])) : [];
+      body.replaceChildren(
+        h(
+          "div",
+          { class: "section" },
+          mrpack && s.lookupError ? h("p", { class: "warn" }, icon("cloud_off"), `Modrinth could not be reached (${s.lookupError}), so every file will be copied.`) : null,
+          h("ul", { class: "rows" }, ...rows)
+        ),
+        copied.length
+          ? h(
+              "div",
+              { class: "section rule" },
+              h("h4", {}, `Copied into the pack · ${copied.length}`),
+              h("p", { class: "hint" }, "Not found on Modrinth, so they travel inside the file. Check that their licenses allow sharing."),
+              h("ul", { class: "files" }, ...copied.map(([kind, f]) => h("li", { title: f }, icon(FILE_ICON[kind]), h("span", {}, f))))
+            )
+          : ""
+      );
+    }
+
+    async function renderRecent() {
+      const all = (await tn.storage.get("recent")) ?? [];
+      const mine = all.filter((r) => r.instance === id);
+      $("recent-box").hidden = !mine.length;
+      $("recent").replaceChildren(
+        ...mine.map((r) =>
+          h(
+            "li",
+            { title: r.path },
+            icon(r.format === "mrpack" ? "inventory_2" : "folder_zip"),
+            h("b", {}, r.path.split(/[\\/]/).pop()),
+            h("time", { datetime: new Date(r.at).toISOString() }, new Date(r.at).toLocaleDateString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }))
+          )
+        )
+      );
+    }
+
+    async function remember(path, format) {
+      const all = (await tn.storage.get("recent")) ?? [];
+      await tn.storage.set("recent", [{ instance: id, path, format, at: Date.now() }, ...all.filter((r) => r.path !== path)].slice(0, 30));
+      await renderRecent();
+    }
+
+    const status = $("status");
+    function show(kind, iconName, ...parts) {
+      status.className = `status ${kind}`;
+      status.replaceChildren(icon(iconName, kind === "busy"), h("span", {}, ...parts));
+    }
+
+    $("go").addEventListener("click", async () => {
+      const o = options();
       $("go").disabled = true;
-      $("status").classList.remove("error");
-      $("status").textContent = format === "mrpack" ? "Looking up mods on Modrinth…" : "";
+      show("busy", "progress_activity", "Looking up mods on Modrinth…");
       try {
-        const path = await exportInstance(tn, tn.context.instance, { format, worlds: $("worlds").checked });
-        $("status").textContent = path ? `Saved to ${path}` : "";
+        // Fresh: mods may have changed since the tab opened.
+        s = await survey(tn, id);
+        renderPreview();
+        show("busy", "progress_activity", "Choose where to save it.");
+        const path = await exportInstance(tn, id, o, s);
+        if (path) {
+          show("ok", "check_circle", "Saved to ", h("b", {}, path));
+          await remember(path, o.format);
+        } else status.replaceChildren();
       } catch (e) {
-        $("status").classList.add("error");
-        $("status").textContent = String(e.message ?? e);
+        show("error", "error", String(e.message ?? e));
       } finally {
         $("go").disabled = false;
       }
-    };
+    });
+    for (const input of document.querySelectorAll("input")) input.addEventListener("change", renderPreview);
+
+    renderPreview();
+    renderRecent();
+    s = await survey(tn, id).catch((e) => {
+      $("contents-hint").textContent = `Could not read the instance: ${e.message ?? e}`;
+      return null;
+    });
+    if (s) renderPreview();
   </script>
 </body>
 </html>

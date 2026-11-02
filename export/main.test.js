@@ -1,7 +1,7 @@
 // node --test export
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { exportInstance, mrpackIndex, prismFiles } from "./main.js";
+import { exportInstance, mrpackIndex, prismFiles, survey } from "./main.js";
 
 const inst = { name: "Pack", version: "1.21.1", loader: "fabric", loaderVersion: "0.16.5" };
 
@@ -35,4 +35,16 @@ test("links hosted mods and leaves them out of overrides", async () => {
   assert.deepEqual(JSON.parse(spec.files["modrinth.index.json"]).files.map((f) => f.path), ["mods/a.jar"]);
   assert.ok(spec.skip.includes("mods/a.jar") && spec.skip.includes("mods/c.jar.disabled") && spec.skip.includes("saves"));
   assert.ok(!spec.skip.includes("mods/b.jar"));
+});
+
+test("surveys what is linked, copied and left out, and survives Modrinth being down", async () => {
+  const tn = (fetch) => ({
+    instances: { get: async () => inst },
+    content: { hashes: async (_, kind) => (kind === "shader" ? { "s.zip": "sss" } : kind === "mod" ? { "a.jar": "aaa", "b.jar.disabled": "bbb" } : {}) },
+    net: { fetch },
+  });
+  const up = await survey(tn(async () => ({ ok: true, json: () => ({ aaa: { files: [{ hashes: { sha1: "aaa", sha512: "A" }, url: "u", size: 1 }] } }) })), "i");
+  assert.deepEqual([up.kinds.mod.hosted.length, up.kinds.mod.off, up.kinds.shader.copied, up.lookupError], [1, ["b.jar.disabled"], ["s.zip"], ""]);
+  const down = await survey(tn(async () => { throw new Error("offline"); }), "i");
+  assert.deepEqual([down.kinds.mod.copied, down.lookupError], [["a.jar"], "offline"]);
 });

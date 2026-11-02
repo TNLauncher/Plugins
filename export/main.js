@@ -46,56 +46,76 @@ export function prismFiles(inst) {
   };
 }
 
-/** Files of the instance Modrinth hosts, found by SHA-1; disabled ones are left out. @param {TN} tn @param {string} id */
-async function hostedFiles(tn, id) {
-  /** @type {Map<string, string>} sha1 -> instance path */
+/**
+ * @typedef {{ hosted: Hosted[]; copied: string[]; off: string[] }} KindSurvey
+ * @typedef {{ inst: Instance; kinds: Record<ContentKind, KindSurvey>; lookupError: string }} Survey
+ */
+
+/**
+ * What the instance's mods, packs and shaders become in an export: files Modrinth hosts (linked in a
+ * .mrpack), files copied as is, and switched-off ones (left out of a .mrpack). Modrinth being unreachable
+ * is not fatal: everything is then copied, and `lookupError` says why.
+ * @param {TN} tn @param {string} id @returns {Promise<Survey>}
+ */
+export async function survey(tn, id) {
+  const inst = await tn.instances.get(id);
+  /** @type {Map<string, { kind: ContentKind; file: string }>} sha1 -> file */
   const bySha1 = new Map();
-  /** @type {string[]} */
-  const disabled = [];
+  const kinds = /** @type {Record<ContentKind, KindSurvey>} */ ({});
   for (const kind of /** @type {ContentKind[]} */ (Object.keys(DIRS))) {
+    kinds[kind] = { hosted: [], copied: [], off: [] };
     for (const [file, sha1] of Object.entries(await tn.content.hashes(id, kind))) {
-      if (file.endsWith(".disabled")) disabled.push(`${DIRS[kind]}/${file}`);
-      else bySha1.set(sha1, `${DIRS[kind]}/${file}`);
+      if (file.endsWith(".disabled")) kinds[kind].off.push(file);
+      else bySha1.set(sha1, { kind, file });
     }
   }
-  /** @type {Hosted[]} */
-  const hosted = [];
+  let lookupError = "";
+  /** @type {Record<string, any>} */
+  let found = {};
   if (bySha1.size) {
-    const res = await tn.net.fetch("https://api.modrinth.com/v2/version_files", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ hashes: [...bySha1.keys()], algorithm: "sha1" }),
-    });
-    if (!res.ok) throw new Error(`Modrinth answered HTTP ${res.status}`);
-    for (const [sha1, version] of Object.entries(/** @type {Record<string, any>} */ (res.json()))) {
-      const f = version.files.find((/** @type {any} */ f) => f.hashes.sha1 === sha1);
-      if (f) hosted.push({ path: /** @type {string} */ (bySha1.get(sha1)), sha1, sha512: f.hashes.sha512, url: f.url, size: f.size });
+    try {
+      const res = await tn.net.fetch("https://api.modrinth.com/v2/version_files", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ hashes: [...bySha1.keys()], algorithm: "sha1" }),
+      });
+      if (!res.ok) throw new Error(`Modrinth answered HTTP ${res.status}`);
+      found = res.json();
+    } catch (e) {
+      lookupError = e instanceof Error ? e.message : String(e);
     }
   }
-  return { hosted, disabled };
+  for (const [sha1, { kind, file }] of bySha1) {
+    const f = found[sha1]?.files.find((/** @type {any} */ f) => f.hashes.sha1 === sha1);
+    if (f) kinds[kind].hosted.push({ path: `${DIRS[kind]}/${file}`, sha1, sha512: f.hashes.sha512, url: f.url, size: f.size });
+    else kinds[kind].copied.push(file);
+  }
+  for (const k of Object.values(kinds)) k.copied.sort((a, b) => a.localeCompare(b));
+  return { inst, kinds, lookupError };
+}
+
+/** @typedef {{ format: "mrpack" | "prism"; worlds: boolean }} Options */
+
+/** The archive `o` asks for. @param {Survey} s @param {Options} o @returns {ExportSpec} */
+export function spec(s, o) {
+  const skip = [...JUNK, ...(o.worlds ? [] : ["saves"])];
+  if (o.format === "prism") return { fileName: `${s.inst.name}.zip`, root: ".minecraft", files: prismFiles(s.inst), skip };
+  const all = /** @type {[ContentKind, KindSurvey][]} */ (Object.entries(s.kinds));
+  const hosted = all.flatMap(([, k]) => k.hosted);
+  return {
+    fileName: `${s.inst.name}.mrpack`,
+    root: "overrides",
+    files: { "modrinth.index.json": JSON.stringify(mrpackIndex(s.inst, hosted), null, 2) },
+    skip: [...skip, ...all.flatMap(([kind, k]) => k.off.map((f) => `${DIRS[kind]}/${f}`)), ...hosted.map((f) => f.path)],
+  };
 }
 
 /**
  * Asks where to save and exports; resolves with the saved path, or null when the user cancels.
- * @param {TN} tn @param {string} id @param {{ format: "mrpack" | "prism"; worlds: boolean }} o
+ * @param {TN} tn @param {string} id @param {Options} o @param {Survey} [s] a survey already made for the preview
  */
-export async function exportInstance(tn, id, o) {
-  const inst = await tn.instances.get(id);
-  const skip = [...JUNK, ...(o.worlds ? [] : ["saves"])];
-  /** @type {ExportSpec} */
-  let spec;
-  if (o.format === "mrpack") {
-    const { hosted, disabled } = await hostedFiles(tn, id);
-    spec = {
-      fileName: `${inst.name}.mrpack`,
-      root: "overrides",
-      files: { "modrinth.index.json": JSON.stringify(mrpackIndex(inst, hosted), null, 2) },
-      skip: [...skip, ...disabled, ...hosted.map((f) => f.path)],
-    };
-  } else {
-    spec = { fileName: `${inst.name}.zip`, root: ".minecraft", files: prismFiles(inst), skip };
-  }
-  return tn.instances.export(id, spec);
+export async function exportInstance(tn, id, o, s) {
+  return tn.instances.export(id, spec(s ?? (await survey(tn, id)), o));
 }
 
 export function activate() {}
