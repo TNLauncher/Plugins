@@ -157,7 +157,7 @@ tn.events.on("game-exited", (/** @type {{ instanceId: string }} */ e) => e.insta
 
 // ─── View ──────────────────────────────────────────────────────────────────
 
-const slots = { crash: h("div"), files: h("div"), problems: h("div") };
+const slots = { crash: h("div"), files: h("div"), problems: h("div", { class: "problems-slot" }) };
 pane.append(h("div", { class: "side" }, slots.crash, slots.files), slots.problems);
 
 function render() {

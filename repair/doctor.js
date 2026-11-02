@@ -447,7 +447,7 @@ export function diagnose({ instance: inst, mods, missing, log, reports, launch }
     add(issues, {
       key: `broken:${m.file}`, kind: "broken", severity: "error", title: `${m.file} is damaged`,
       detail: "It is not a readable jar, so the loader will fail on it. Repair restores pack files; anything else has to go.",
-      fixes: [fix(`Delete ${m.file}`, { kind: "deleteMod", file: m.file })], crash: false,
+      fixes: [fix("Delete", { kind: "deleteMod", file: m.file })], crash: false,
     });
   }
 
@@ -462,7 +462,7 @@ export function diagnose({ instance: inst, mods, missing, log, reports, launch }
       add(issues, {
         key: `duplicate:${extra.file}`, kind: "duplicate", severity: "error", title: `${idx.name(id)} is installed twice`,
         detail: `${extra.file} and ${newest.file} are the same mod; loaders refuse to start with both.`,
-        fixes: [fix(`Remove ${extra.file}`, { kind: "disableMod", file: extra.file })], crash: false,
+        fixes: [fix("Remove this copy", { kind: "disableMod", file: extra.file })], crash: false,
       });
     }
   }
@@ -485,7 +485,7 @@ export function diagnose({ instance: inst, mods, missing, log, reports, launch }
     add(issues, {
       key: `foreign:${m.file}`, kind: "foreign", severity: "warning", title: `${m.file} is a ${m.foreign} mod`,
       detail: `${LOADER_LABEL[inst.loader]} skips it, so whatever needs it will not find it.`,
-      fixes: [fix(`Turn off ${m.file}`, { kind: "disableMod", file: m.file })], crash: false,
+      fixes: [fix("Turn off", { kind: "disableMod", file: m.file })], crash: false,
     });
   }
 
