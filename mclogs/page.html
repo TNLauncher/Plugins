@@ -1,70 +1,326 @@
 <!doctype html>
-<html>
+<html lang="en">
 <head>
   <meta charset="utf-8">
+  <title>Share log</title>
   <style>
-    body { padding: 24px; display: flex; flex-direction: column; gap: 14px; max-width: 640px; }
-    h1 { margin: 0; font-size: 18px; font-weight: 600; }
-    p { margin: 0; color: var(--muted); }
-    .row { display: flex; gap: 8px; align-items: center; }
-    input { flex: 1; font: inherit; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--card); color: var(--fg); }
-    button { font: inherit; padding: 6px 14px; border-radius: 8px; border: 1px solid var(--border); background: var(--card); color: var(--fg); cursor: pointer; }
-    button.primary { background: var(--accent); border-color: transparent; color: #fff; }
-    button:disabled { opacity: 0.5; cursor: default; }
-    .error { color: var(--critical); }
+    /* Tokens and base styles come from the launcher (__tn/theme.css); controls mirror its kit. */
+    html, body { height: 100%; }
+    body { padding: 0 2px 16px; overflow: hidden; }
+    .layout { height: 100%; display: grid; grid-template-columns: minmax(300px, 380px) minmax(0, 1fr); gap: 16px; }
+    .pane {
+      min-height: 0; padding: 16px; display: flex; flex-direction: column; gap: 14px; overflow-y: auto;
+      border-radius: 18px; background: var(--window); border: 1px solid var(--card-border); box-shadow: var(--highlight);
+    }
+    .head { display: flex; flex-direction: column; gap: 4px; }
+    h3 { margin: 0; font-size: 13px; font-weight: 600; line-height: 1.3; }
+    h4 { margin: 0; font-size: 11px; font-weight: 500; color: var(--subtle); }
+    .head p { margin: 0; font-size: 12px; line-height: 1.5; color: var(--muted); }
+    .section { display: flex; flex-direction: column; gap: 6px; }
+    .rule { padding-top: 14px; box-shadow: inset 0 1px 0 var(--card-border); }
+    .grow { flex: 1; }
+
+    /* Sources: the selected one is previewed on the right. */
+    .sources { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 4px; }
+    .source {
+      display: grid; grid-template-columns: 32px minmax(0, 1fr) auto; align-items: center; gap: 8px 12px; padding: 8px; margin: 0 -8px;
+      border-radius: 12px; cursor: pointer; transition: background var(--quick) var(--butter);
+    }
+    .source:hover { background: var(--card); }
+    .source[aria-current="true"] { background: var(--card-hover); box-shadow: var(--highlight); }
+    .source:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+    .mark { width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center; background: rgb(10 132 255 / 0.12); color: var(--accent); }
+    .mark .icon { font-size: 18px; }
+    .crash .mark { background: rgb(255 69 58 / 0.12); color: var(--critical); }
+    .text { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+    .text b { font-size: 12px; font-weight: 600; }
+    .text span { font-size: 12px; color: var(--muted); }
+    .extra { grid-column: 2 / -1; display: flex; align-items: center; gap: 6px; min-width: 0; }
+    .extra[hidden] { display: none; }
+    .extra.error { font-size: 12px; color: var(--critical); overflow-wrap: anywhere; }
+    .extra.error .icon { font-size: 15px; }
+
+    .link {
+      flex: 1; min-width: 0; height: 32px; padding: 0 12px; border-radius: var(--r-sm); outline: none;
+      background: var(--card); border: 1px solid var(--border); box-shadow: var(--highlight);
+      font: 11px var(--mono); color: var(--link);
+      transition: border-color var(--quick) var(--butter), box-shadow var(--soft) var(--butter);
+    }
+    .link:focus { border-color: var(--accent); box-shadow: var(--highlight), 0 0 0 4px rgb(10 132 255 / 0.16); }
+
+    /* Shared before. */
+    .history { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; }
+    .history li { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto auto; align-items: center; gap: 8px; padding: 6px 0; font-size: 12px; }
+    .history li + li { box-shadow: inset 0 1px 0 var(--card-border); }
+    .history li > .icon { font-size: 16px; color: var(--subtle); }
+    .history li.crash > .icon { color: var(--critical); }
+    .history a { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 11px var(--mono); color: var(--link); text-decoration: none; cursor: pointer; }
+    .history a:hover { text-decoration: underline; text-underline-offset: 2px; }
+    .history time { font-size: 11px; color: var(--subtle); white-space: nowrap; }
+    .empty-note { margin: 0; font-size: 12px; color: var(--subtle); }
+
+    .note { display: flex; align-items: flex-start; gap: 6px; margin: 0; padding-top: 12px; box-shadow: inset 0 1px 0 var(--card-border); font-size: 12px; line-height: 1.5; color: var(--subtle); }
+    .note .icon { font-size: 15px; }
+
+    /* Preview: what the upload holds. */
+    .viewer { padding: 0; gap: 0; overflow: hidden; }
+    .viewer-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 12px 12px 12px 16px; box-shadow: inset 0 -1px 0 var(--card-border); }
+    .viewer-head h3 { margin-right: auto; }
+    .pills { display: flex; gap: 4px; padding: 2px; border-radius: 999px; background: rgb(255 255 255 / 0.05); }
+    .pill { height: 24px; padding: 0 10px; border-radius: 999px; display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 500; color: var(--muted); transition: background var(--quick) var(--butter), color var(--quick) var(--butter); }
+    .pill:hover { color: var(--fg); }
+    .pill:disabled { opacity: 0.4; pointer-events: none; }
+    .pill[aria-pressed="true"] { background: var(--btn-hover); color: var(--fg); box-shadow: var(--highlight); }
+    .pill .n { font: 500 10.5px var(--mono); color: var(--subtle); }
+    .pill.warn .n { color: var(--warning); }
+    .pill.error .n { color: var(--critical); }
+    .lines { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: auto; padding: 8px 0 12px; }
+    .lines::-webkit-scrollbar-thumb { background: rgb(255 255 255 / 0.12); }
+    .ln { display: grid; grid-template-columns: 6ch minmax(0, 1fr); gap: 14px; padding: 0 16px 0 8px; font: 11px/1.6 var(--mono); }
+    .ln:hover { background: rgb(255 255 255 / 0.03); }
+    .ln span:first-child { text-align: right; color: rgb(245 245 247 / 0.28); user-select: none; -webkit-user-select: none; font-variant-numeric: tabular-nums; }
+    .ln span:last-child { white-space: pre-wrap; overflow-wrap: anywhere; color: var(--muted); -webkit-user-select: text; user-select: text; cursor: text; }
+    .ln.warn span:last-child { color: var(--warning); }
+    .ln.error { background: rgb(255 69 58 / 0.06); }
+    .ln.error span:last-child { color: rgb(255 160 153); }
+    .log-note { margin: 0; padding: 4px 16px 8px; font: 11px var(--mono); color: var(--subtle); }
+    .blank { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 32px; text-align: center; font-size: 12px; color: var(--muted); }
+    .blank .icon { font-size: 28px; color: var(--subtle); }
+
+    .btn {
+      height: 28px; padding: 0 12px; border-radius: 999px; display: inline-flex; align-items: center; gap: 6px;
+      background: var(--btn); border: 1px solid rgb(255 255 255 / 0.06); box-shadow: var(--highlight);
+      font-size: 12px; font-weight: 500; white-space: nowrap;
+      transition: background var(--quick) var(--butter), opacity var(--quick) var(--butter), transform var(--soft) var(--spring);
+    }
+    .btn:hover { background: var(--btn-hover); }
+    .btn:active { transform: scale(0.95); transition: transform var(--press) var(--butter); }
+    .btn:disabled { opacity: 0.6; pointer-events: none; }
+    .btn .icon { font-size: 16px; }
+    .icon-btn {
+      width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; flex-shrink: 0;
+      background: var(--btn); border: 1px solid rgb(255 255 255 / 0.06); color: var(--icon);
+      transition: background var(--quick) var(--butter), color var(--quick) var(--butter);
+    }
+    .icon-btn:hover { background: var(--btn-hover); color: var(--fg); }
+    .icon-btn .icon { font-size: 16px; }
+    .icon-btn.sm { width: 26px; height: 26px; background: none; border-color: transparent; }
+    .icon-btn.sm:hover { background: var(--btn); }
+    .icon-btn.sm .icon { font-size: 15px; }
+    .copied { color: var(--green) !important; }
+    .copied .icon { animation: tick var(--slow) var(--spring); }
+    @keyframes tick { from { opacity: 0; transform: scale(0.4); } }
+
+    @media (max-width: 760px) {
+      body { overflow-y: auto; }
+      .layout { height: auto; grid-template-columns: minmax(0, 1fr); }
+      .viewer { height: 70vh; }
+    }
   </style>
 </head>
 <body>
-  <h1>Share log</h1>
-  <p>Uploads to <b>mclo.gs</b>, which hides IP addresses and access tokens. Anyone with the link can read it.</p>
-  <div class="row">
-    <button class="primary" id="log">Upload game log</button>
-    <button id="crash" hidden>Upload crash report</button>
+  <div class="layout">
+    <section class="pane" aria-labelledby="title">
+      <div class="head">
+        <h3 id="title">Share log</h3>
+        <p>Upload what the game printed and paste the link where you ask for help.</p>
+      </div>
+      <ul class="sources" id="sources"></ul>
+      <div class="section rule grow">
+        <h4>Shared before</h4>
+        <ul class="history" id="history"></ul>
+      </div>
+      <p class="note"><i class="icon" aria-hidden="true">shield</i><span>Uploads go to mclo.gs, which hides IP addresses and access tokens. Anyone with the link can read the log.</span></p>
+    </section>
+
+    <section class="pane viewer" aria-labelledby="preview-title">
+      <header class="viewer-head">
+        <h3 id="preview-title">Game log</h3>
+        <div class="pills" role="group" aria-label="Show" id="pills"></div>
+      </header>
+      <div class="lines selectable" id="lines" role="log" tabindex="0"></div>
+    </section>
   </div>
-  <div class="row" id="result" hidden>
-    <input id="url" readonly aria-label="Link">
-    <button id="copy">Copy</button>
-    <button id="open">Open</button>
-  </div>
-  <p id="status" role="status"></p>
   <script type="module">
-    import { upload } from "./main.js";
+    import { classify, tail, upload, MAX_LINES } from "./main.js";
     const id = tn.context.instance;
     const $ = (s) => document.getElementById(s);
-    const status = (text, error = false) => ((($("status").textContent = text), $("status").classList.toggle("error", error)));
+    /** Lines drawn at once; the upload still holds up to MAX_LINES. */
+    const SHOWN = 4000;
 
-    const crash = await tn.instances.crashReports(id);
-    $("crash").hidden = !crash;
-
-    async function share(read, button) {
-      button.disabled = true;
-      status("Uploading…");
-      try {
-        const text = await read();
-        if (!text.trim()) throw new Error("Nothing to upload yet: launch the game first.");
-        $("url").value = await upload(tn, text);
-        $("result").hidden = false;
-        status("Done. Paste the link where you ask for help.");
-      } catch (e) {
-        status(String(e.message ?? e), true);
-      } finally {
-        button.disabled = false;
+    /** @param {string} tag @param {Record<string, any>} attrs @param {(Node | string | null | false)[]} kids */
+    function h(tag, attrs = {}, ...kids) {
+      const e = document.createElement(tag);
+      for (const [k, v] of Object.entries(attrs)) {
+        if (v == null || v === false) continue;
+        if (k.startsWith("on")) e.addEventListener(k.slice(2), v);
+        else if (k === "class") e.className = v;
+        else e.setAttribute(k, v === true ? "" : v);
       }
+      e.append(...kids.filter((k) => k != null && k !== false));
+      return e;
+    }
+    const icon = (name, spin = false) => h("i", { class: `icon${spin ? " spin" : ""}`, "aria-hidden": "true" }, name);
+    const count = (n) => n.toLocaleString();
+    const when = (at) => new Date(at).toLocaleDateString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+
+    const SOURCES = {
+      log: { label: "Game log", icon: "description", read: () => tn.instances.readLog(id) },
+      crash: { label: "Crash report", icon: "heart_broken", read: () => tn.instances.crashReports(id) },
+    };
+    const state = { texts: { log: "", crash: "" }, selected: "log", filter: "all" };
+
+    function copyButton(url, cls = "icon-btn") {
+      const btn = h("button", { type: "button", class: cls, title: "Copy link", "aria-label": "Copy link" }, icon("content_copy"));
+      btn.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        try {
+          await navigator.clipboard.writeText(url);
+        } catch {
+          // The frame may not reach the clipboard; the link field stays selected for Ctrl+C.
+          return;
+        }
+        btn.classList.add("copied");
+        btn.replaceChildren(icon("check"));
+        setTimeout(() => (btn.classList.remove("copied"), btn.replaceChildren(icon("content_copy"))), 1500);
+      });
+      return btn;
+    }
+    const openButton = (url, cls = "icon-btn") =>
+      h("button", { type: "button", class: cls, title: "Open in browser", "aria-label": "Open in browser", onclick: (e) => (e.stopPropagation(), tn.open(url)) }, icon("open_in_new"));
+
+    // ─── Sources ───
+
+    function source(kind) {
+      const { label, icon: iconName, read } = SOURCES[kind];
+      const text = state.texts[kind];
+      const lines = text ? text.split("\n").filter(Boolean).length : 0;
+      const meta = kind === "log" ? (lines ? `Last session · ${count(lines)} lines` : "Nothing yet: launch the game first") : `From the last crash · ${count(lines)} lines`;
+      const result = h("div", { class: "extra" });
+      result.hidden = true;
+      const btn = h("button", { type: "button", class: "btn", disabled: !lines }, icon("cloud_upload"), "Upload");
+
+      btn.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        btn.disabled = true;
+        btn.replaceChildren(icon("progress_activity", true), "Uploading");
+        let again = "Upload again";
+        try {
+          const fresh = await read();
+          if (!fresh.trim()) throw new Error("The log is empty: launch the game first.");
+          const url = await upload(tn, fresh);
+          const field = h("input", { class: "link selectable", readonly: "", "aria-label": `${label} link` });
+          field.value = url;
+          result.className = "extra";
+          result.replaceChildren(field, copyButton(url), openButton(url));
+          result.hidden = false;
+          field.select();
+          await remember(kind, url);
+        } catch (err) {
+          result.className = "extra error";
+          result.replaceChildren(icon("error"), h("span", {}, String(err.message ?? err)));
+          result.hidden = false;
+          again = "Try again";
+        }
+        btn.replaceChildren(icon("cloud_upload"), again);
+        btn.disabled = false;
+      });
+
+      const row = h(
+        "li",
+        { class: `source ${kind}`, tabindex: "0", "aria-current": String(state.selected === kind), title: `Preview the ${label.toLowerCase()}` },
+        h("span", { class: "mark", "aria-hidden": "true" }, icon(iconName)),
+        h("div", { class: "text" }, h("b", {}, label), h("span", {}, meta)),
+        btn,
+        result
+      );
+      const pick = () => select(kind);
+      row.addEventListener("click", (e) => !e.target.closest("input, button") && pick());
+      row.addEventListener("keydown", (e) => (e.key === "Enter" || e.key === " ") && e.target === row && (e.preventDefault(), pick()));
+      return row;
     }
 
-    $("log").onclick = () => share(() => tn.instances.readLog(id), $("log"));
-    $("crash").onclick = () => share(async () => crash, $("crash"));
-    $("open").onclick = () => tn.open($("url").value);
-    $("copy").onclick = async () => {
-      // The frame may not get clipboard access; then the selected text is one Ctrl+C away.
-      $("url").select();
-      try {
-        await navigator.clipboard.writeText($("url").value);
-        status("Copied.");
-      } catch {
-        status("Press Ctrl+C to copy the selected link.");
+    function select(kind) {
+      state.selected = kind;
+      for (const row of $("sources").children) row.setAttribute("aria-current", String(row.classList.contains(kind)));
+      renderPreview();
+    }
+
+    // ─── History ───
+
+    async function remember(kind, url) {
+      const all = (await tn.storage.get("history")) ?? [];
+      await tn.storage.set("history", [{ instance: id, kind, url, at: Date.now() }, ...all].slice(0, 50));
+      await renderHistory();
+    }
+
+    async function renderHistory() {
+      const mine = ((await tn.storage.get("history")) ?? []).filter((r) => r.instance === id).slice(0, 12);
+      $("history").replaceChildren(
+        ...(mine.length
+          ? mine.map((r) =>
+              h(
+                "li",
+                { class: r.kind },
+                icon(SOURCES[r.kind]?.icon ?? "description"),
+                h("a", { title: `${SOURCES[r.kind]?.label ?? "Log"} · ${r.url}`, onclick: () => tn.open(r.url) }, r.url.replace(/^https:\/\//, "")),
+                h("time", { datetime: new Date(r.at).toISOString() }, when(r.at)),
+                copyButton(r.url, "icon-btn sm")
+              )
+            )
+          : [h("p", { class: "empty-note" }, "Links you upload are kept here.")])
+      );
+    }
+
+    // ─── Preview ───
+
+    function renderPreview() {
+      const kind = state.selected;
+      const text = state.texts[kind];
+      $("preview-title").textContent = SOURCES[kind].label;
+      const all = classify(tail(text)).filter((l, i, a) => l.line || i < a.length - 1);
+      const n = { all: all.length, warn: all.filter((l) => l.level === "warn").length, error: all.filter((l) => l.level === "error").length };
+      if (state.filter !== "all" && !n[state.filter]) state.filter = "all";
+      $("pills").replaceChildren(
+        ...[["all", "All"], ["warn", "Warnings"], ["error", "Errors"]].map(([f, label]) =>
+          h(
+            "button",
+            { type: "button", class: `pill ${f}`, "aria-pressed": String(state.filter === f), disabled: f !== "all" && !n[f], onclick: () => ((state.filter = f), renderPreview()) },
+            label,
+            h("span", { class: "n" }, count(n[f]))
+          )
+        )
+      );
+
+      const log = $("lines");
+      if (!text.trim()) {
+        log.replaceChildren(h("div", { class: "blank" }, icon("article"), "Nothing to show yet. Launch the game and its log appears here."));
+        return;
       }
-    };
+      const numbered = all.map((l, i) => ({ ...l, n: i + 1 })).filter((l) => state.filter === "all" || l.level === state.filter);
+      const shown = numbered.slice(-SHOWN);
+      log.replaceChildren(
+        shown.length < numbered.length ? h("p", { class: "log-note" }, `Showing the last ${count(shown.length)} of ${count(numbered.length)} lines. The upload has all of them.`) : "",
+        ...shown.map((l) => h("div", { class: `ln ${l.level}` }, h("span", {}, String(l.n)), h("span", {}, l.line || " ")))
+      );
+      // The end of a log is where it broke.
+      log.scrollTop = log.scrollHeight;
+    }
+
+    async function load() {
+      const [log, crash] = await Promise.all([tn.instances.readLog(id), tn.instances.crashReports(id)]);
+      state.texts = { log, crash };
+      if (!crash && state.selected === "crash") state.selected = "log";
+      $("sources").replaceChildren(source("log"), ...(crash ? [source("crash")] : []));
+      // A crash is what support asks about first.
+      if (crash && !load.done) select("crash");
+      else renderPreview();
+      load.done = true;
+    }
+
+    await Promise.all([load(), renderHistory()]);
+    // A finished session leaves a new log, and maybe a crash report.
+    tn.events.on("game-exited", (e) => e.instanceId === id && load());
   </script>
 </body>
 </html>

@@ -23,4 +23,23 @@ export async function upload(tn, text) {
   return out.url;
 }
 
+/** @typedef {"error" | "warn" | "info"} Level */
+
+const ERROR = /[[/](ERROR|FATAL|SEVERE)\]|^(\S+\.)?\S*(Exception|Error)(:|$)/;
+const WARN = /[[/]WARN(ING)?\]/;
+/** Stack frames and `Caused by` lines belong to the line they follow. */
+const CONTINUES = /^\s+at |^\s*\.\.\. \d+ more|^Caused by: |^\s+Suppressed: /;
+
+/** Each line with its level; a stack trace takes the level of the line that threw it. @param {string} text */
+export function classify(text) {
+  /** @type {Level} */
+  let last = "info";
+  return text.split("\n").map((line) => {
+    /** @type {Level} */
+    const level = CONTINUES.test(line) ? last : ERROR.test(line) ? "error" : WARN.test(line) ? "warn" : "info";
+    last = level;
+    return { line, level };
+  });
+}
+
 export function activate() {}
