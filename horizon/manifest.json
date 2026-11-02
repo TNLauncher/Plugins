@@ -1,0 +1,15 @@
+{
+  "id": "horizon",
+  "name": "Horizon",
+  "version": "1.0.0",
+  "api": 1,
+  "description": "Minecraft: Java Edition rewritten in Rust (unofficial). Plays from your own copy of Minecraft; Java mods don't run.",
+  "contributes": {
+    "runtime": { "hint": "Minecraft rewritten in Rust", "icon": "rocket_launch", "requiresMicrosoft": true }
+  },
+  "permissions": {
+    "hosts": ["api.github.com"],
+    "downloads": ["https://github.com/horizon-rust/horizon/releases/download/"],
+    "programs": true
+  }
+}

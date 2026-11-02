@@ -14,6 +14,7 @@ Official and example plugins for [TNLauncher](https://github.com/TNLauncher/Laun
 | [`mclogs`](./mclogs) | Instance tab | Uploads the game log or crash report to mclo.gs for a shareable link |
 | [`export`](./export) | Instance tab | Exports an instance as a Modrinth `.mrpack` or a Prism/MultiMC zip |
 | [`prism`](./prism) | Importer | Imports Prism Launcher and MultiMC instance zips |
+| [`horizon`](./horizon) | Game runtime | Plays [Horizon](https://github.com/horizon-rust/horizon), Minecraft rewritten in Rust, from your own copy of Minecraft |
 | [`examples/sessions`](./examples/sessions) | Page & instance tab | Example plugin that records play sessions |
 
 ## Installation
