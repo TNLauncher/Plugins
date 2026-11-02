@@ -19,6 +19,12 @@ Official and example plugins for [TNLauncher](https://github.com/TNLauncher/Laun
 
 ## Installation
 
+Open **Settings → Plugins → Store** in TNLauncher and press **Install**. The store reads `index.json` from the
+[`registry` release](https://github.com/TNLauncher/Plugins/releases/tag/registry), which the `publish` workflow rebuilds
+on every push to `main`.
+
+By hand:
+
 1. Open **Settings → Plugins → Open folder** in TNLauncher.
 2. Copy the desired plugin folder (e.g. `modrinth`, `curseforge`, `discord`, `elyby`, `offline`) into the opened `plugins` directory.
 3. Restart TNLauncher.
@@ -29,4 +35,7 @@ Official and example plugins for [TNLauncher](https://github.com/TNLauncher/Laun
 npm test                          # run unit tests
 npx tsc -p tsconfig.json          # typecheck plugins against packages/plugin-api
 node run.mjs <plugin> <method>    # run a plugin method against the live network
+node scripts/build-index.mjs      # pack plugins into dist/ and write dist/index.json
 ```
+
+**Bump `version` in `manifest.json` whenever you change a plugin**: the store offers an update only when the version differs.

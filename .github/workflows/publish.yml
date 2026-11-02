@@ -1,0 +1,28 @@
+name: publish
+
+# Rebuilds the store catalog on every push to main: plugin zips and index.json on the `registry` release.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency: publish
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm test
+      - run: node scripts/build-index.mjs
+      - env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release view registry >/dev/null 2>&1 || gh release create registry --title "Plugin registry" --notes "Built by the publish workflow; the launcher's plugin store reads index.json here." --latest=false
+          gh release upload registry dist/* --clobber
